@@ -4,7 +4,7 @@ from typing import Union
 
 import requests
 
-from utils.use_logger import WrapperRichLogger
+from .utils.use_logger import WrapperRichLogger
 
 
 class IxBrowser:

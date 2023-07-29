@@ -28,3 +28,11 @@ ixbrowser.api_browser_open(1)
 ixbrowser.api_browser_close(1)
 ```
 
+Build
+=====
+```bash
+pip install twine setuptools
+
+python setup.py sdist bdist_wheel
+twine upload  --skip-existing dist/*
+```
