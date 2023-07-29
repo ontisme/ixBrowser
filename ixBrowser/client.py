@@ -1,4 +1,6 @@
+import random
 import time
+import uuid
 import winreg
 from typing import Union
 
@@ -184,12 +186,13 @@ class IxBrowser:
                     # 否則直接返回該字典
                     return data_obj
             elif isinstance(data_obj, list):
-                # 如果是[{"data": ...}, {"data": ...}]，則遞歸處理每個元素，只返回最後一個
-                return get_deepest_data(data_obj[-1])
+                # 如果是[{"data": ...}, {"data": ...}]
+                return data_obj
             else:
                 # 如果既不是字典也不是列表，則返回None
                 return None
 
+        # self.logger.log(response)
         result = {}
 
         # 檢查是否有"error"和"data"鍵
@@ -197,6 +200,10 @@ class IxBrowser:
             # 檢查error code是否為0
             if response["error"]["code"] == 0:
                 result["result"] = True
+            else:
+                result["result"] = False
+                result["error"] = response["error"]
+                return result
 
             # 將原始的"data"內容放入新的"data"字典中
             result["data"] = response["data"]
@@ -208,9 +215,17 @@ class IxBrowser:
 
         return result
 
-    def api_browser_list(self, page: int = 1, limit: int = 1000, group_id: int = 0, name: str = ""):
+    def api_browser_list(self, page: int = 1, limit: int = 1000, group_id: int = 0, name: str = "",
+                         include_fields: list[str] = None, exclude_fields: list[str] = None):
         """
-        取得ixBrowser的瀏覽器列表
+        獲取ixBrowser的瀏覽器列表
+        :param page:            頁碼
+        :param limit:           每頁顯示的數量
+        :param group_id:        組ID
+        :param name:            瀏覽器名稱
+        :param include_fields:  只回傳想要的瀏覽器配置
+        :param exclude_fields:  排除不想回傳的瀏覽器配置
+        :return:
         """
         params = {
             "page": page,
@@ -218,17 +233,34 @@ class IxBrowser:
             "group_id": group_id,
             "name": name
         }
-        return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-list", json=params).json())
+
+        response = self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-list", json=params).json())
+
+        # 如果有指定的欄位，則將其餘不包含的欄位刪除
+        if include_fields is not None:
+            for browser in response["data"]:
+                for key in list(browser.keys()):
+                    if key not in include_fields:
+                        del browser[key]
+
+        # 如果有指定要排除的欄位，則將其餘欄位刪除
+        if exclude_fields is not None:
+            for browser in response["data"]:
+                for key in list(browser.keys()):
+                    if key in exclude_fields:
+                        del browser[key]
+
+        return response
 
     def api_browser_open(self, profile_id: int, args: list = None, load_extensions: bool = False,
                          load_default_page: bool = False):
         """
         開啟ixBrowser
 
-        :param profile_id:  Profile的ID
-        :param args:    開啟ixBrowser的參數
-        :param load_extensions: 是否載入ixBrowser的擴充套件
-        :param load_default_page: 是否載入ixBrowser的預設頁面
+        :param profile_id:          Profile的ID
+        :param args:                開啟ixBrowser的參數
+        :param load_extensions:     是否載入ixBrowser的擴充套件
+        :param load_default_page:   是否載入ixBrowser的預設頁面
         :return:
         """
         if profile_id < 1:
@@ -244,7 +276,7 @@ class IxBrowser:
         }
         return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-open", json=params).json())
 
-    def api_browser_close(self, profile_id: Union[int, list]):
+    def api_browser_close(self, profile_id: Union[int, list[int]]):
         """
         關閉ixBrowser
 
@@ -260,7 +292,255 @@ class IxBrowser:
         }
         return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-close-all", json=params).json())
 
+    def api_browser_cache_clear(self, profile_id: Union[int, list[int]]):
+        """
+        清除ixBrowser快取
+
+        profile_id 是int也可以是一個list，清除多個ixBrowser的快取
+
+        :param profile_id:  profile_id的ID
+        :return: {'result': Bool } 不必關注結果，因為沒有緩存也會回傳False
+
+        """
+        if isinstance(profile_id, int):
+            profile_id = [profile_id]
+        params = {
+            "profile_id": profile_id
+        }
+        return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-cache-clear", json=params).json())
+
+    def api_browser_create(self, config: dict = None, **kwargs):
+        """
+        建立ixBrowser
+
+        :param config:
+        :param random_config:  是否隨機產生ixBrowser的指紋設定
+        :param kwargs:    建立ixBrowser的參數
+                        {
+                            "color": "#CC9966",
+                            "site_url": "http://google.com/",
+                            "name": "google",
+                            "note": "",
+                            "group_id": 1,
+                            "username": "",
+                            "password": "",
+                            "proxy_mode": 2,
+                            "proxy_type": "direct",
+                            "proxy_ip": "",
+                            "proxy_port": "",
+                            "proxy_user": "",
+                            "proxy_password": "",
+                            "cookie": "",
+                            "open_url": "",
+                            "display_url": "",
+                            "proxy_id": "",
+                            "config": {
+                                "hardware_concurrency": "4",
+                                "device_memory": "8",
+                                "is_cookies_cache": "1",
+                                "is_tabs_cache": "0",
+                                "is_proxy_check": "0",
+                                "is_proxy_change": false,
+                                "ua_type": 1,
+                                "platform": "Windows",
+                                "br_version": "",
+                                "ua_info": "Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36",
+                                "language_type": "1",
+                                "language": "cn",
+                                "timezone_type": "1",
+                                "timezone": "Asia/Shanghai",
+                                "location": "1",
+                                "location_type": "1",
+                                "longitude": 25.7247,
+                                "latitude": 119.3712,
+                                "accuracy": 1000,
+                                "resolving_power_type": "1",
+                                "resolving_power": "1920,1080",
+                                "fonts_type": "1",
+                                "fonts": [],
+                                "webrtc": "1",
+                                "webgl_image": "1",
+                                "canvas_type": "1",
+                                "webgl_data_type": "1",
+                                "webgl_factory": "Google Inc.",
+                                "webgl_info": "ANGLE (AMD, ATI Radeon HD 4200 Direct3D9Ex vs_3_0 ps_3_0, atiumd64.dll-8.14.10.678)",
+                                "audio_context": "1",
+                                "media_equipment": "1",
+                                "client_rects": "1",
+                                "speech_voices": "1",
+                                "product_type": "1",
+                                "track": "1",
+                                "allow_scan_ports": "0",
+                                "allow_scan_ports_content": "",
+                                "real_ip": "120.36.89.204"
+                            }
+                        }
+        :return:
+        """
+
+        def random_color():
+            return "#{:02x}{:02x}{:02x}".format(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+
+        def random_ip_address():
+            return ".".join([str(random.randint(0, 255)) for _ in range(4)])
+
+        config = config or {}
+        # 隨機顏色
+
+        base_values = {
+            "color": random_color(),
+            "site_url": "https://google.com/",
+            "name": uuid.uuid4().hex[:8], "note": "", "group_id": 1, "username": "", "password": "",
+            "proxy_mode": 2, "proxy_type": "direct", "proxy_ip": "", "proxy_port": "", "proxy_user": "",
+            "proxy_password": "", "cookie": "", "open_url": "", "display_url": "", "proxy_id": "",
+            'config': {
+                "hardware_concurrency": "4",
+                "device_memory": "8",
+                "is_cookies_cache": "1",
+                "is_tabs_cache": "0",
+                "is_proxy_check": "0",
+                "is_proxy_change": False,
+                "ua_type": 1,
+                "platform": "Windows",
+                "br_version": "",
+                "ua_info": "Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36",
+                "language_type": "1",
+                "language": "cn",
+                "timezone_type": "1",
+                "timezone": "Asia/Taipei",
+                "location": "1",
+                "location_type": "1",
+                "longitude": 25.7247,
+                "latitude": 119.3712,
+                "accuracy": 1000,
+                "resolving_power_type": "1",
+                "resolving_power": "1920,1080",
+                "fonts_type": "1",
+                "fonts": [],
+                "webrtc": "1",
+                "webgl_image": "1",
+                "canvas_type": "1",
+                "webgl_data_type": "1",
+                "webgl_factory": "Google Inc.",
+                "webgl_info": "ANGLE (AMD, ATI Radeon HD 4200 Direct3D9Ex vs_3_0 ps_3_0, atiumd64.dll-8.14.10.678)",
+                "audio_context": "1",
+                "media_equipment": "1",
+                "client_rects": "1",
+                "speech_voices": "1",
+                "product_type": "1",
+                "track": "1",
+                "allow_scan_ports": "0",
+                "allow_scan_ports_content": "",
+                "real_ip": random_ip_address()
+            }}
+
+        # 使用传入的kwargs参数更新默认值
+        base_values.update(config)
+        base_values.update(kwargs)
+        return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-create", json=base_values).json())
+
+    def api_browser_update(self, profile_id: int, config: dict = None, **kwargs):
+        """
+        更新ixBrowser信息
+
+        # TODO 更新尚未完成
+
+        :param profile_id:  ixBrowser的profile_id
+        :param config:  Profile配置信息
+        :return:
+        """
+        config = config or {}
+        base_values = {
+            "profile_id": profile_id,
+            "color": "#CC9966",
+            "site_url": "http://google.com/",
+            "name": uuid.uuid4().hex[:8],
+            "note": "",
+            "group_id": 1,
+            "username": "",
+            "password": "",
+            "proxy_mode": 2,
+            "proxy_type": "direct",
+            "proxy_ip": "",
+            "proxy_port": "",
+            "proxy_user": "",
+            "proxy_password": "",
+            "cookie": "",
+            "open_url": "",
+            "display_url": "",
+            "proxy_id": "",
+        }
+        base_values['config'] = {
+            "hardware_concurrency": "4",
+            "device_memory": "8",
+            "is_cookies_cache": "1",
+            "is_tabs_cache": "0",
+            "is_proxy_check": "0",
+            "is_proxy_change": False,
+            "ua_type": 1,
+            "platform": "Windows",
+            "br_version": "",
+            "ua_info": "Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36",
+            "language_type": "1",
+            "language": "cn",
+            "timezone_type": "1",
+            "timezone": "Asia/Shanghai",
+            "location": "1",
+            "location_type": "1",
+            "longitude": 25.7247,
+            "latitude": 119.3712,
+            "accuracy": 1000,
+            "resolving_power_type": "1",
+            "resolving_power": "1920,1080",
+            "fonts_type": "1",
+            "fonts": [],
+            "webrtc": "1",
+            "webgl_image": "1",
+            "canvas_type": "1",
+            "webgl_data_type": "1",
+            "webgl_factory": "Google Inc.",
+            "webgl_info": "ANGLE (AMD, ATI Radeon HD 4200 Direct3D9Ex vs_3_0 ps_3_0, atiumd64.dll-8.14.10.678)",
+            "audio_context": "1",
+            "media_equipment": "1",
+            "client_rects": "1",
+            "speech_voices": "1",
+            "product_type": "1",
+            "track": "1",
+            "allow_scan_ports": "0",
+            "allow_scan_ports_content": "",
+            "real_ip": "120.36.89.204"
+        }
+        base_values.update(config)
+        base_values.update(kwargs)
+        return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-update", json=base_values).json())
+
+    def api_browser_delete(self, profile_id: Union[int, list[int]]):
+        """
+        删除ixBrowser
+
+        :param profile_id:  ixBrowser的profile_id
+        :return:
+        """
+        if isinstance(profile_id, int):
+            profile_id = [profile_id]
+        params = {
+            "profile_id": profile_id
+        }
+        return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-deleted", json=params).json())
+
+    def api_browser_random_info(self, profile_id: int):
+        """
+        隨機ixBrowser信息
+
+        :param profile_id:  ixProfile ID
+        :return:
+        """
+        params = {
+            "profile_id": profile_id
+        }
+        return self.__api_response(self.ses.post(self.ixbrowser_api_host + "random-browser-info", json=params).json())
+
 
 if __name__ == '__main__':
     ixbrowser = IxBrowser()
-    ixbrowser.get_ixbrowser_info()
+    # print(ixbrowser.api_browser_create())
