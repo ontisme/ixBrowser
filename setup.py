@@ -1,3 +1,4 @@
+import os
 import pathlib
 from setuptools import setup, find_packages
 
@@ -10,7 +11,7 @@ URL = "https://github.com/ontisme/ixBrowser"
 DOWNLOAD_URL = "https://pypi.org/project/ixBrowser/"
 
 LICENSE = "MIT"
-VERSION = "1.7.2"
+VERSION = os.getenv("TAG", "0.0.0")
 DESCRIPTION = "A SDK for ixBrowser"
 LONG_DESCRIPTION = (HERE / "README.md").read_text(encoding="utf8")
 LONG_DESC_TYPE = "text/markdown"
