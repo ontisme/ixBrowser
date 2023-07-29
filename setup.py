@@ -1,18 +1,45 @@
-# 引用包管理工具setuptools，其中find_packages可以幫我們便捷的找到自己代碼中編寫的庫
+import pathlib
 from setuptools import setup, find_packages
-VERSION = "0.0.1"
+
+HERE = pathlib.Path(__file__).parent.resolve()
+
+PACKAGE_NAME = "ixBrowser"
+AUTHOR = "Alan Ting & Ontisme"
+AUTHOR_EMAIL = "alanting0716@gmail.com"
+URL = "https://github.com/ontisme/ixBrowser"
+DOWNLOAD_URL = "https://pypi.org/project/ixBrowser/"
+
+LICENSE = "MIT"
+VERSION = "1.3.0"
+DESCRIPTION = "A SDK for ixBrowser"
+LONG_DESCRIPTION = (HERE / "docs" / "README.md").read_text(encoding="utf8")
+LONG_DESC_TYPE = "text/markdown"
+
+with open((HERE / "requirements.txt"), encoding="utf8", errors='ignore') as f:
+    requirements = f.read()
+INSTALL_REQUIRES = [s.strip() for s in requirements.split("\n")]
+
+with open((HERE / "dev_requirements.txt"), encoding="utf8", errors='ignore') as f:
+    dev_requirements = f.read()
+EXTRAS_REQUIRE = {"dev": [s.strip() for s in dev_requirements.split("\n")]}
+
+CLASSIFIERS = [f"Programming Language :: Python :: 3.{str(v)}" for v in range(7, 12)]
+PYTHON_REQUIRES = ">=3.7"
 
 setup(
-    name='ixBrowser',  # 包名稱，之後如果上傳到了pypi，則需要通過該名稱下載
-    version=VERSION,  # version只能是數字，還有其他字符則會報錯
-    description='Unofficial ixBrowser Python SDK',
-    long_description='',
-    license='MIT',  # 遵循的協議
-    install_requires=[],  # 這里面填寫項目用到的第三方依賴
-    author='LYFX',
-    author_email='lyfxme@gmail.com',
-    packages=find_packages(),  # 項目內所有自己編寫的庫
-    platforms='windows',
-    url='https://github.com/ontisme/ixBrowser',  # 項目鏈接,
-    include_package_data=True,
+    name=PACKAGE_NAME,
+    version=VERSION,
+    description=DESCRIPTION,
+    long_description=LONG_DESCRIPTION,
+    long_description_content_type=LONG_DESC_TYPE,
+    author=AUTHOR,
+    license=LICENSE,
+    author_email=AUTHOR_EMAIL,
+    url=URL,
+    download_url=DOWNLOAD_URL,
+    python_requires=PYTHON_REQUIRES,
+    install_requires=INSTALL_REQUIRES,
+    extras_require=EXTRAS_REQUIRE,
+    packages=find_packages(),
+    classifiers=CLASSIFIERS,
 )

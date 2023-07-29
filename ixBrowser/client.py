@@ -1,4 +1,3 @@
-import re
 import time
 import winreg
 from typing import Union
@@ -9,11 +8,11 @@ from utils.use_logger import WrapperRichLogger
 
 
 class IxBrowser:
-    def __init__(self, api_host: str = "http://127.0.0.1:53200/api/"):
+    def __init__(self, api_port: int = 53200):
         self.ixbrowser_install_dir: str
         self.ixbrowser_exe_path: str
         self.ixbrowser_version: str
-        self.ixbrowser_api_host = api_host
+        self.ixbrowser_api_host = f"http://127.0.0.1:{api_port}/api/"
         self.logger = WrapperRichLogger()
         self.ses = requests.Session()
         self.headers = {
@@ -210,15 +209,15 @@ class IxBrowser:
 
         return result
 
-    def api_browser_list(self):
+    def api_browser_list(self, page: int = 1, limit: int = 1000, group_id: int = 0, name: str = ""):
         """
         取得ixBrowser的瀏覽器列表
         """
         params = {
-            "page": 1,
-            "limit": 1000,
-            "group_id": 0,
-            "name": ""
+            "page": page,
+            "limit": limit,
+            "group_id": group_id,
+            "name": name
         }
         return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-list", json=params).json())
 
@@ -266,5 +265,3 @@ class IxBrowser:
 if __name__ == '__main__':
     ixbrowser = IxBrowser()
     ixbrowser.get_ixbrowser_info()
-
-

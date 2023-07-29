@@ -1,10 +1,10 @@
 import unittest
 
-from ixbrowser.client import IxBrowser
+from ixBrowser.client import IxBrowser
 
 
 class TestIxBrowser(unittest.TestCase):
-    ixbrowser = IxBrowser()
+    ixbrowser = IxBrowser(9893)
 
     def test_5_api_browser_close(self):
         info = self.ixbrowser.api_browser_close(1)
