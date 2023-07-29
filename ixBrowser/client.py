@@ -3,8 +3,7 @@ import winreg
 from typing import Union
 
 import requests
-
-from .utils.use_logger import WrapperRichLogger
+from ixBrowser.utils.use_logger import WrapperRichLogger
 
 
 class IxBrowser:
