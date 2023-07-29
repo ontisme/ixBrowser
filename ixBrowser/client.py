@@ -2,7 +2,7 @@ import random
 import time
 import uuid
 import winreg
-from typing import Union
+from typing import Union, List
 
 import requests
 from ixBrowser.utils.use_logger import WrapperRichLogger
@@ -216,7 +216,7 @@ class IxBrowser:
         return result
 
     def api_browser_list(self, page: int = 1, limit: int = 1000, group_id: int = 0, name: str = "",
-                         include_fields: list[str] = None, exclude_fields: list[str] = None):
+                         include_fields: List[str] = None, exclude_fields: List[str] = None):
         """
         獲取ixBrowser的瀏覽器列表
         :param page:            頁碼
@@ -276,7 +276,7 @@ class IxBrowser:
         }
         return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-open", json=params).json())
 
-    def api_browser_close(self, profile_id: Union[int, list[int]]):
+    def api_browser_close(self, profile_id: Union[int, List[int]]):
         """
         關閉ixBrowser
 
@@ -292,7 +292,7 @@ class IxBrowser:
         }
         return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-close-all", json=params).json())
 
-    def api_browser_cache_clear(self, profile_id: Union[int, list[int]]):
+    def api_browser_cache_clear(self, profile_id: Union[int, List[int]]):
         """
         清除ixBrowser快取
 
@@ -514,7 +514,7 @@ class IxBrowser:
         base_values.update(kwargs)
         return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-update", json=base_values).json())
 
-    def api_browser_delete(self, profile_id: Union[int, list[int]]):
+    def api_browser_delete(self, profile_id: Union[int, List[int]]):
         """
         删除ixBrowser
 
