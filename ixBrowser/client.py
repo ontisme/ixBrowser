@@ -3,9 +3,11 @@ import time
 import uuid
 import winreg
 from typing import Union, List
-
 import requests
-from ixBrowser.utils.use_logger import WrapperRichLogger
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+
+from core.ixBrowser.utils.use_logger import WrapperRichLogger
 
 
 class IxBrowser:
@@ -16,6 +18,7 @@ class IxBrowser:
         self.ixbrowser_api_host = f"http://127.0.0.1:{api_port}/api/"
         self.logger = WrapperRichLogger()
         self.ses = requests.Session()
+        self.current_browser_list: dict = {}
         self.headers = {
             "Content-Type": "application/json"
         }
@@ -163,6 +166,7 @@ class IxBrowser:
             return True
         return False
 
+    # region iXBrowser API
     def __api_response(self, response):
         """
         API響應處理函數
@@ -215,18 +219,45 @@ class IxBrowser:
 
         return result
 
-    def api_browser_list(self, page: int = 1, limit: int = 1000, group_id: int = 0, name: str = "",
-                         include_fields: List[str] = None, exclude_fields: List[str] = None):
+    def api_group_list(self, page: int = 1, limit: int = 1000, title: str = ""):
+        """
+        獲取ixBrowser的組列表
+
+        :param page:
+        :param limit:
+        :param title: 組名稱
+        :return: {'result': True, 'data': [{'title': 'ixb', 'id': 6628}]}
+        """
+
+        params = {
+            "page": page,
+            "limit": limit,
+            "title": title
+        }
+        return self.__api_response(self.ses.post(self.ixbrowser_api_host + "group-list", json=params).json())
+
+    def api_browser_list(self, page: int = 1, limit: int = 1000, group: Union[str, int] = "",
+                         name: str = "", include_fields: List[str] = None, exclude_fields: List[str] = None):
         """
         獲取ixBrowser的瀏覽器列表
         :param page:            頁碼
         :param limit:           每頁顯示的數量
-        :param group_id:        組ID
+        :param group:           組名稱或是組ID，支持多型態
         :param name:            瀏覽器名稱
         :param include_fields:  只回傳想要的瀏覽器配置
         :param exclude_fields:  排除不想回傳的瀏覽器配置
         :return:
         """
+        group_id = 0
+        # 透過組名稱尋找組ID
+        if isinstance(group, str):
+            res = self.api_group_list(title=group)
+            if res["result"]:
+                if len(res["data"]) > 0:
+                    group_id = res["data"][0]["id"]
+        else:
+            raise Exception("錯誤的group參數")
+
         params = {
             "page": page,
             "limit": limit,
@@ -252,29 +283,71 @@ class IxBrowser:
 
         return response
 
-    def api_browser_open(self, profile_id: int, args: list = None, load_extensions: bool = False,
-                         load_default_page: bool = False):
+    def api_browser_open(self, profile_id: int, browser_open_random=False, args: list = None,
+                         load_extensions: bool = False,
+                         load_default_page: bool = False, proxy_mode: str = "2", dynamic_proxy_id: int = None,
+                         country: str = "TW",
+                         proxy_ip: str = None, proxy_port: str = None, proxy_type: str = "socks5",
+                         proxy_user: str = None, proxy_password: str = None, headless: bool = False
+
+                         ):
         """
         開啟ixBrowser
 
         :param profile_id:          Profile的ID
+        :param browser_open_random: 是否開啟時隨機指紋
         :param args:                開啟ixBrowser的參數
         :param load_extensions:     是否載入ixBrowser的擴充套件
         :param load_default_page:   是否載入ixBrowser的預設頁面
+        :param proxy_mode:          代理模式  1:购买的流量包 2:自定义
+        :param dynamic_proxy_id:    动态流量包ID  proxy_mode=1时必填
+        :param country:             国家  proxy_mode=1时必填
+        :param proxy_ip:            代理IP  proxy_mode=2时必填
+        :param proxy_port:          代理端口  proxy_mode=2时必填
+        :param proxy_type:          代理类型  proxy_mode=2时必填 "direct" or "socks5"
+        :param proxy_user:          代理用户名  proxy_mode=2时必填
+        :param proxy_password:      代理密码  proxy_mode=2时必填
+
         :return:
         """
         if profile_id < 1:
             raise ValueError("Profile ID 必須大於 0")
 
         if args is None:
-            args = []
-        params = {
-            "profile_id": profile_id,
-            "args": args,
-            "load_extensions": load_extensions,
-            "load_default_page": load_default_page
-        }
-        return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-open", json=params).json())
+            args = [
+                "--disable-extension-welcome-page"
+            ]
+            if headless:
+                args.append("--headless")
+
+        if browser_open_random:
+            params = {
+                "profile_id": profile_id,
+                "args": args,
+                "load_extensions": load_extensions,
+                "load_default_page": load_default_page,
+                "dynamic_proxy_id": dynamic_proxy_id,
+                "country": country,
+                "proxy_ip": proxy_ip,
+                "proxy_mode": proxy_mode,
+                "proxy_port": proxy_port,
+                "proxy_type": proxy_type,
+                "proxy_user": proxy_user,
+                "proxy_password": proxy_password,
+            }
+            res = self.__api_response(
+                self.ses.post(self.ixbrowser_api_host + "browser-open-random", json=params).json())
+        else:
+            params = {
+                "profile_id": profile_id,
+                "args": args,
+                "load_extensions": load_extensions,
+                "load_default_page": load_default_page,
+            }
+            res = self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-open", json=params).json())
+        if res["result"]:
+            self.current_browser_list[profile_id] = res["data"]
+        return res
 
     def api_browser_close(self, profile_id: Union[int, List[int]]):
         """
@@ -290,7 +363,13 @@ class IxBrowser:
         params = {
             "profile_id": profile_id
         }
-        return self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-close-all", json=params).json())
+        res = self.__api_response(self.ses.post(self.ixbrowser_api_host + "browser-close-all", json=params).json())
+        if res["result"]:
+            for pid in profile_id:
+                if pid in self.current_browser_list:
+                    self.current_browser_list.pop(pid, None)
+
+        return res
 
     def api_browser_cache_clear(self, profile_id: Union[int, List[int]]):
         """
@@ -441,9 +520,7 @@ class IxBrowser:
 
     def api_browser_update(self, profile_id: int, config: dict = None, **kwargs):
         """
-        更新ixBrowser信息
-
-        # TODO 更新尚未完成
+        更新ixBrowser信息v2
 
         :param profile_id:  ixBrowser的profile_id
         :param config:  Profile配置信息
@@ -452,63 +529,29 @@ class IxBrowser:
         config = config or {}
         base_values = {
             "profile_id": profile_id,
-            "color": "#CC9966",
-            "site_url": "http://google.com/",
-            "name": uuid.uuid4().hex[:8],
+            "site_url": "",
+            "name": "",
             "note": "",
             "group_id": 1,
             "username": "",
             "password": "",
-            "proxy_mode": 2,
-            "proxy_type": "direct",
-            "proxy_ip": "",
-            "proxy_port": "",
-            "proxy_user": "",
-            "proxy_password": "",
             "cookie": "",
-            "open_url": "",
-            "display_url": "",
-            "proxy_id": "",
-        }
-        base_values['config'] = {
-            "hardware_concurrency": "4",
-            "device_memory": "8",
-            "is_cookies_cache": "1",
-            "is_tabs_cache": "0",
-            "is_proxy_check": "0",
-            "is_proxy_change": False,
-            "ua_type": 1,
-            "platform": "Windows",
-            "br_version": "",
-            "ua_info": "Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36",
-            "language_type": "1",
+            "language_type": "2",
             "language": "cn",
-            "timezone_type": "1",
-            "timezone": "Asia/Shanghai",
+            "timezone_type": "2",
+            "timezone": "Asia/Taiwan",
             "location": "1",
             "location_type": "1",
-            "longitude": 25.7247,
-            "latitude": 119.3712,
-            "accuracy": 1000,
-            "resolving_power_type": "1",
-            "resolving_power": "1920,1080",
-            "fonts_type": "1",
-            "fonts": [],
-            "webrtc": "1",
-            "webgl_image": "1",
-            "canvas_type": "1",
-            "webgl_data_type": "1",
+            "longitude": "25.7247",
+            "latitude": "119.3712",
+            "cookies_cache": "0",
+            "disable_image": "0",
+            "disable_audio": "0",
             "webgl_factory": "Google Inc.",
             "webgl_info": "ANGLE (AMD, ATI Radeon HD 4200 Direct3D9Ex vs_3_0 ps_3_0, atiumd64.dll-8.14.10.678)",
-            "audio_context": "1",
-            "media_equipment": "1",
-            "client_rects": "1",
-            "speech_voices": "1",
-            "product_type": "1",
-            "track": "1",
-            "allow_scan_ports": "0",
-            "allow_scan_ports_content": "",
-            "real_ip": "120.36.89.204"
+            "user_agent": {
+                "ua_info": "Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36"
+            }
         }
         base_values.update(config)
         base_values.update(kwargs)
@@ -540,7 +583,40 @@ class IxBrowser:
         }
         return self.__api_response(self.ses.post(self.ixbrowser_api_host + "random-browser-info", json=params).json())
 
+    # endregion
+    # region WebDriver Functions
+    def get_selenium_driver(self, profile_id: int, browser_open_random=False, proxy_ip: str = None,
+                            proxy_port: str = None, proxy_user: str = None, proxy_password: str = None,
+                            proxy_type: str = "socks5", headless: bool = False):
+        """
+        獲取selenium driver
 
-if __name__ == '__main__':
-    ixbrowser = IxBrowser()
-    # print(ixbrowser.api_browser_create())
+        返回一個 Selenium WebDriver 實例
+        :param profile_id:  ixBrowser的profile_id
+        :param browser_open_random: 是否隨機指紋
+        :param proxy_ip:    代理IP
+        :param proxy_port:  代理Port
+        :param proxy_user:  代理帳號
+        :param proxy_password:  代理密碼
+        :param proxy_type:  代理類型
+
+        :return:
+        """
+
+        # 如果沒有開啟過
+        if profile_id not in self.current_browser_list:
+            res = self.api_browser_open(profile_id=profile_id, browser_open_random=browser_open_random,
+                                        proxy_ip=proxy_ip, proxy_port=proxy_port, proxy_user=proxy_user,
+                                        proxy_password=proxy_password, proxy_type=proxy_type, headless=headless)
+            if not res["result"]:
+                err_msg = "開啟ixBrowser失敗，原因：{}".format(res["error"])
+                self.logger.error(err_msg)
+                raise Exception(err_msg)
+        options = webdriver.ChromeOptions()
+
+        options.add_experimental_option("debuggerAddress", self.current_browser_list[profile_id]['debugging_address'])
+        service = Service(self.current_browser_list[profile_id]['webdriver'])
+        driver = webdriver.Chrome(service=service, options=options)
+        return driver
+    # endregion
+
