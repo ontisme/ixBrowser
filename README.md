@@ -1,4 +1,10 @@
-ixBrowser
+```
+Now, there is an official library available. Please refer to it by visiting the following link:
+```
+[Official ixBrowser Python Library](https://github.com/ixspyinc/ixbrowser-local-api-python)
+
+
+Unoffical ixBrowser
 =======
 
 Client for ixBrowser API written in Python
